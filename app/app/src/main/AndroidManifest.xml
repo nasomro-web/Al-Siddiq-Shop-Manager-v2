@@ -1,15 +1,494 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:allowBackup="true"
-        android:label="Al-Siddiq Shop Manager"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>
+
+package com.alsiddiq.shopmanager;
+
+import android.app.*;
+import android.os.Bundle;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.*;
+import android.widget.*;
+import android.content.*;
+import android.database.*;
+import android.database.sqlite.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+public class MainActivity extends Activity {
+
+    int green = Color.rgb(20, 112, 68);
+    int dark = Color.rgb(13, 75, 48);
+    int pale = Color.rgb(239, 247, 241);
+    int white = Color.WHITE;
+    DB db;
+    LinearLayout root;
+
+    @Override
+    public void onCreate(Bundle b) {
+        super.onCreate(b);
+        db = new DB(this);
+        getWindow().setStatusBarColor(dark);
+        getWindow().setNavigationBarColor(dark);
+        home();
+    }
+
+    GradientDrawable shape(int color, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        return d;
+    }
+
+    TextView label(String s, int size, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        if (bold) t.setTypeface(null, Typeface.BOLD);
+        return t;
+    }
+
+    LinearLayout vertical() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(1);
+        return l;
+    }
+
+    LinearLayout horizontal() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(0);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        return l;
+    }
+
+    void home() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        root = vertical();
+        root.setBackgroundColor(pale);
+        root.setPadding(14, 12, 14, 12);
+        scroll.addView(root);
+        setContentView(scroll);
+
+        LinearLayout header = vertical();
+        header.setPadding(18, 18, 18, 20);
+        header.setBackground(shape(dark, 20));
+
+        header.addView(label("AL-SIDDIQ", 25, white, true));
+        header.addView(label("SHOP MANAGER", 15, white, true));
+        header.addView(label("Business Accounting System", 12,
+                Color.rgb(210, 235, 218), false));
+        header.addView(label("\nWelcome, Nasrullah Soomro", 16, white, true));
+        root.addView(header);
+
+        TextView overview = label("ACCOUNT OVERVIEW", 17, dark, true);
+        overview.setPadding(3, 20, 0, 10);
+        root.addView(overview);
+
+        LinearLayout row1 = horizontal();
+        row1.addView(accountCard("DAILY INCOME", dailyIncome(), "Rs."));
+        row1.addView(accountCard("NET PROFIT", profit(), "Rs."));
+        root.addView(row1);
+
+        LinearLayout row2 = horizontal();
+        row2.addView(accountCard("CUSTOMER DUE", due(), "Rs."));
+        row2.addView(accountCard("EXPENSES", expenses(), "Rs."));
+        root.addView(row2);
+
+        TextView services = label("SHOP SERVICES", 17, dark, true);
+        services.setPadding(3, 20, 0, 10);
+        root.addView(services);
+
+        String[] names = {
+            "＋  New Booking", "＋  New Expense",
+            "▣  NADRA / E-Sahulat", "🚗  Vehicle Biometric",
+            "▤  Printer & Paper", "▦  Stock & Material",
+            "♙  Customer Khata", "◷  Internet Packages"
+        };
+
+        String[] keys = {
+            "booking", "expense", "nadra", "vehicle",
+            "printer", "stock", "khata", "internet"
+        };
+
+        for (int i = 0; i < names.length; i += 2) {
+            LinearLayout row = horizontal();
+            row.addView(menuButton(names[i], keys[i]));
+            row.addView(menuButton(names[i + 1], keys[i + 1]));
+            root.addView(row);
+        }
+
+        TextView reports = label("QUICK REPORTS", 17, dark, true);
+        reports.setPadding(3, 20, 0, 10);
+        root.addView(reports);
+
+        LinearLayout reportRow = horizontal();
+        reportRow.addView(reportButton("Daily", "daily"));
+        reportRow.addView(reportButton("Weekly", "weekly"));
+        reportRow.addView(reportButton("Monthly", "monthly"));
+        root.addView(reportRow);
+
+        Button excel = new Button(this);
+        excel.setText("⇩  EXPORT EXCEL FILE");
+        excel.setTextColor(white);
+        excel.setBackgroundTintList(
+            android.content.res.ColorStateList.valueOf(green));
+        root.addView(excel);
+        excel.setOnClickListener(v -> exportCSV());
+
+        LinearLayout nav = horizontal();
+        nav.setBackground(shape(dark, 16));
+        nav.setPadding(5, 10, 5, 10);
+        String[] navNames = {"⌂\nHome", "▤\nHistory",
+                "⚙\nSettings", "☁\nBackup", "ⓘ\nAbout"};
+        for (String n : navNames) {
+            TextView item = label(n, 12, white, true);
+            item.setGravity(Gravity.CENTER);
+            nav.addView(item, new LinearLayout.LayoutParams(0, 55, 1));
+            item.setOnClickListener(v -> openNav(n));
+        }
+        root.addView(nav);
+    }
+
+    View accountCard(String name, double amount, String unit) {
+        LinearLayout card = vertical();
+        card.setPadding(13, 15, 8, 15);
+        card.setBackground(shape(white, 16));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, 92, 1);
+        p.setMargins(4, 4, 4, 4);
+        card.addView(label(name, 11, green, true));
+        card.addView(label(unit + " " + String.format(Locale.US, "%.0f", amount),
+                19, dark, true));
+        card.setLayoutParams(p);
+        return card;
+    }
+
+    View menuButton(String title, String key) {
+        TextView b = label(title, 14, dark, true);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(shape(white, 16));
+        b.setElevation(2);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, 75, 1);
+        p.setMargins(4, 5, 4, 5);
+        b.setLayoutParams(p);
+        b.setOnClickListener(v -> openModule(key));
+        return b;
+    }
+
+    View reportButton(String title, String key) {
+        TextView b = label(title, 13, green, true);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(shape(white, 12));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, 48, 1);
+        p.setMargins(4, 3, 4, 3);
+        b.setLayoutParams(p);
+        b.setOnClickListener(v -> report(key));
+        return b;
+    }
+
+    double total(String query) {
+        Cursor c = db.getReadableDatabase().rawQuery(query, null);
+        double value = 0;
+        if (c.moveToFirst()) value = c.getDouble(0);
+        c.close();
+        return value;
+    }
+
+    double dailyIncome() {
+        return total("SELECT IFNULL(SUM(service_fee),0) FROM bookings WHERE date='" + date() + "'");
+    }
+
+    double expenses() {
+        return total("SELECT IFNULL(SUM(amount),0) FROM expenses WHERE date='" + date() + "'");
+    }
+
+    double due() {
+        return total("SELECT IFNULL(SUM(due),0) FROM bookings");
+    }
+
+    double profit() {
+        return dailyIncome() - expenses();
+    }
+
+    String date() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+    }
+
+    void openModule(String key) {
+        switch (key) {
+            case "booking": bookingForm(); break;
+            case "expense": expenseForm(); break;
+            case "khata": showRecords("Customer Khata",
+                "SELECT name,mobile,total,paid,due FROM bookings ORDER BY id DESC"); break;
+            case "nadra": serviceForm("NADRA / E-Sahulat"); break;
+            case "vehicle": serviceForm("Vehicle Biometric"); break;
+            case "printer": printerForm(); break;
+            case "stock": stockForm(); break;
+            case "internet": internetForm(); break;
+        }
+    }
+
+    EditText field(LinearLayout box, String hint, boolean numeric) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        if (numeric) e.setInputType(2);
+        box.addView(e);
+        return e;
+    }
+
+    void bookingForm() {
+        LinearLayout box = vertical();
+        EditText name = field(box, "Customer Name", false);
+        EditText mobile = field(box, "Mobile Number", true);
+        EditText village = field(box, "Village", false);
+        EditText service = field(box, "Service", false);
+        EditText gov = field(box, "Government Fees", true);
+        EditText fee = field(box, "Service Charges", true);
+        EditText paid = field(box, "Amount Paid", true);
+
+        formDialog("New Booking", box, () -> {
+            double g = val(gov), f = val(fee), p = val(paid);
+            if (name.getText().toString().trim().isEmpty() || g < 0 ||
+                    f < 0 || p < 0 || p > g + f) {
+                msg("Check customer name and amounts");
+                return;
+            }
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("name", name.getText().toString());
+            v.put("mobile", mobile.getText().toString());
+            v.put("village", village.getText().toString());
+            v.put("service", service.getText().toString());
+            v.put("gov_fee", g);
+            v.put("service_fee", f);
+            v.put("total", g + f);
+            v.put("paid", p);
+            v.put("due", g + f - p);
+            db.getWritableDatabase().insert("bookings", null, v);
+            msg("Booking saved");
+            home();
+        });
+    }
+
+    void expenseForm() {
+        LinearLayout box = vertical();
+        EditText name = field(box, "Expense Name", false);
+        EditText amount = field(box, "Amount", true);
+        EditText details = field(box, "Details", false);
+        formDialog("New Expense", box, () -> {
+            if (val(amount) <= 0) { msg("Enter amount"); return; }
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("category", name.getText().toString());
+            v.put("details", details.getText().toString());
+            v.put("amount", val(amount));
+            db.getWritableDatabase().insert("expenses", null, v);
+            msg("Expense saved");
+            home();
+        });
+    }
+
+    void serviceForm(String title) {
+        LinearLayout box = vertical();
+        EditText name = field(box, "Customer Name", false);
+        EditText tracking = field(box, "Tracking ID", false);
+        EditText ref = field(box, "Reference Code", false);
+        EditText total = field(box, "Total Fees", true);
+        EditText gov = field(box, "Government Fees", true);
+        EditText paid = field(box, "Amount Paid", true);
+        EditText issue = field(box, "Issue / Pad / Unpad Status", false);
+        formDialog(title, box, () -> {
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("name", name.getText().toString());
+            v.put("tracking", tracking.getText().toString());
+            v.put("reference", ref.getText().toString());
+            v.put("total", val(total));
+            v.put("gov", val(gov));
+            v.put("paid", val(paid));
+            v.put("status", issue.getText().toString());
+            db.getWritableDatabase().insert("services", null, v);
+            msg("Record saved");
+            home();
+        });
+    }
+
+    void printerForm() {
+        LinearLayout box = vertical();
+        EditText opening = field(box, "Opening Printer Count", true);
+        EditText closing = field(box, "Closing Printer Count", true);
+        EditText paper = field(box, "Paper Used", true);
+        EditText income = field(box, "Printing Income", true);
+        formDialog("Printer Daily Record", box, () -> {
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("opening", val(opening));
+            v.put("closing", val(closing));
+            v.put("paper", val(paper));
+            v.put("income", val(income));
+            db.getWritableDatabase().insert("printer", null, v);
+            msg("Printer record saved");
+            home();
+        });
+    }
+
+    void stockForm() {
+        LinearLayout box = vertical();
+        EditText item = field(box, "Material Name (Paper, Roll, Photo Paper...)", false);
+        EditText qty = field(box, "Quantity Purchased", true);
+        EditText cost = field(box, "Purchase Cost", true);
+        formDialog("Stock & Material", box, () -> {
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("item", item.getText().toString());
+            v.put("quantity", val(qty));
+            v.put("cost", val(cost));
+            db.getWritableDatabase().insert("stock", null, v);
+            msg("Stock saved");
+            home();
+        });
+    }
+
+    void internetForm() {
+        LinearLayout box = vertical();
+        EditText pack = field(box, "Internet Package Name", false);
+        EditText amount = field(box, "Payment Amount", true);
+        formDialog("Internet Package", box, () -> {
+            ContentValues v = new ContentValues();
+            v.put("date", date());
+            v.put("category", "Internet: " + pack.getText().toString());
+            v.put("details", "Internet package payment");
+            v.put("amount", val(amount));
+            db.getWritableDatabase().insert("expenses", null, v);
+            msg("Package payment saved");
+            home();
+        });
+    }
+
+    void formDialog(String title, LinearLayout box, Runnable save) {
+        box.setPadding(18, 8, 18, 8);
+        ScrollView s = new ScrollView(this);
+        s.addView(box);
+        new AlertDialog.Builder(this).setTitle(title)
+            .setView(s).setNegativeButton("Cancel", null)
+            .setPositiveButton("Save", (d, w) -> save.run()).show();
+    }
+
+    double val(EditText e) {
+        try { return Double.parseDouble(e.getText().toString()); }
+        catch (Exception x) { return 0; }
+    }
+
+    void report(String period) {
+        String start = date();
+        if (period.equals("weekly"))
+            start = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                .format(new Date(System.currentTimeMillis() - 6L * 86400000));
+        if (period.equals("monthly")) start = date().substring(0, 8) + "01";
+
+        SQLiteDatabase d = db.getReadableDatabase();
+        String where = "date >= ? AND date <= ?";
+        String[] args = {start, date()};
+        double income = query(d, "SELECT IFNULL(SUM(service_fee),0) FROM bookings WHERE " + where, args);
+        double govt = query(d, "SELECT IFNULL(SUM(gov_fee),0) FROM bookings WHERE " + where, args);
+        double exp = query(d, "SELECT IFNULL(SUM(amount),0) FROM expenses WHERE " + where, args);
+        double dueValue = query(d, "SELECT IFNULL(SUM(due),0) FROM bookings WHERE " + where, args);
+
+        new AlertDialog.Builder(this).setTitle(period.toUpperCase() + " REPORT")
+            .setMessage("From: " + start + "\nTo: " + date() +
+                "\n\nService Charges: Rs. " + income +
+                "\nGovernment Fees: Rs. " + govt +
+                "\nShop Expenses: Rs. " + exp +
+                "\nCustomer Due: Rs. " + dueValue +
+                "\n\nBusiness Profit: Rs. " + (income - exp))
+            .setPositiveButton("Close", null).show();
+    }
+
+    double query(SQLiteDatabase d, String sql, String[] args) {
+        Cursor c = d.rawQuery(sql, args);
+        double x = c.moveToFirst() ? c.getDouble(0) : 0;
+        c.close();
+        return x;
+    }
+
+    void showRecords(String title, String sql) {
+        Cursor c = db.getReadableDatabase().rawQuery(sql, null);
+        StringBuilder s = new StringBuilder();
+        while (c.moveToNext()) {
+            for (int i = 0; i < c.getColumnCount(); i++)
+                s.append(c.getColumnName(i)).append(": ")
+                 .append(c.getString(i)).append("\n");
+            s.append("----------------\n");
+        }
+        c.close();
+        if (s.length() == 0) s.append("No records yet.");
+        new AlertDialog.Builder(this).setTitle(title).setMessage(s.toString())
+            .setPositiveButton("Close", null).show();
+    }
+
+    void exportCSV() {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("text/csv");
+        i.putExtra(Intent.EXTRA_TITLE, "AlSiddiq_Accounts.csv");
+        startActivityForResult(i, 10);
+    }
+
+    @Override
+    protected void onActivityResult(int r, int result, Intent data) {
+        super.onActivityResult(r, result, data);
+        if (r == 10 && result == RESULT_OK && data != null) {
+            try {
+                StringBuilder csv = new StringBuilder();
+                csv.append("Date,Customer,Mobile,Village,Service,Government Fee,Service Fee,Total,Paid,Due\n");
+                Cursor c = db.getReadableDatabase().rawQuery(
+                    "SELECT date,name,mobile,village,service,gov_fee,service_fee,total,paid,due FROM bookings", null);
+                while (c.moveToNext()) {
+                    for (int j = 0; j < 10; j++) {
+                        if (j > 0) csv.append(",");
+                        csv.append("\"").append(c.getString(j) == null ? "" :
+                            c.getString(j).replace("\"", "\"\"")).append("\"");
+                    }
+                    csv.append("\n");
+                }
+                c.close();
+                java.io.OutputStream out = getContentResolver().openOutputStream(data.getData());
+                out.write(csv.toString().getBytes("UTF-8"));
+                out.close();
+                msg("Excel-compatible CSV exported");
+            } catch (Exception e) { msg("Export error"); }
+        }
+    }
+
+    void openNav(String name) {
+        if (name.contains("Home")) home();
+        else if (name.contains("History")) showRecords("Bookings",
+            "SELECT date,name,service,total,paid,due FROM bookings ORDER BY id DESC");
+        else if (name.contains("Settings"))
+            new AlertDialog.Builder(this).setTitle("Settings")
+                .setMessage("Al-Siddiq Shop Manager\nGreen & White Edition")
+                .setPositiveButton("OK", null).show();
+        else if (name.contains("Backup"))
+            msg("Use Export Excel File to save your records.");
+        else msg("Al-Siddiq Shop Manager");
+    }
+
+    void msg(String s) {
+        Toast.makeText(this, s, Toast.LENGTH_LONG).show();
+    }
+
+    class DB extends SQLiteOpenHelper {
+        DB(Context c) { super(c, "alsiddiq_new.db", null, 1); }
+
+        public void onCreate(SQLiteDatabase d) {
+            d.execSQL("CREATE TABLE bookings (id INTEGER PRIMARY KEY AUTOINCREMENT,date TEXT,name TEXT,mobile TEXT,village TEXT,service TEXT,gov_fee REAL,service_fee REAL,total REAL,paid REAL,due REAL)");
+            d.execSQL("CREATE TABLE expenses (id INTEGER PRIMARY KEY AUTOINCREMENT,date TEXT,category TEXT,details TEXT,amount REAL)");
+            d.execSQL("CREATE TABLE services (id INTEGER PRIMARY KEY AUTOINCREMENT,date TEXT,name TEXT,tracking TEXT,reference TEXT,total REAL,gov REAL,paid REAL,status TEXT)");
+            d.execSQL("CREATE TABLE printer (id INTEGER PRIMARY KEY AUTOINCREMENT,date TEXT,opening REAL,closing REAL,paper REAL,income REAL)");
+            d.execSQL("CREATE TABLE stock (id INTEGER PRIMARY KEY AUTOINCREMENT,date TEXT,item TEXT,quantity REAL,cost REAL)");
+        }
+
+        public void onUpgrade(SQLiteDatabase d, int oldVersion, int newVersion) {}
+    }
+}
